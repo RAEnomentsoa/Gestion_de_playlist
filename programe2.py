@@ -33,6 +33,7 @@ def extract_metadata(path):
         "album": tag("album"),
         "genre": tag("genre"),
         "date": tag("date"),
+        "language": tag("language"),
         "duration": round(audio.info.length, 2),
         "bitrate": audio.info.bitrate // 1000,
         "sample_rate": audio.info.sample_rate,
@@ -62,8 +63,8 @@ def make_handler(channel):
 
         log(PROG_TAG, f"Extracted: title={meta['title']}, artist={meta['artist']}, "
                        f"album={meta['album']}, genre={meta['genre']}, date={meta['date']}, "
-                       f"duration={meta['duration']}, bitrate={meta['bitrate']}, "
-                       f"sample_rate={meta['sample_rate']}, mode={meta['mode']}")
+                       f"language={meta['language']}, duration={meta['duration']}, "
+                       f"bitrate={meta['bitrate']}, sample_rate={meta['sample_rate']}, mode={meta['mode']}")
 
         out_body = json.dumps({
             "path": path,
@@ -73,6 +74,7 @@ def make_handler(channel):
             "album": meta["album"],
             "genre": meta["genre"],
             "date": meta["date"],
+            "language": meta["language"],
             "duration": meta["duration"],
             "bitrate": meta["bitrate"],
             "sample_rate": meta["sample_rate"],

@@ -7,9 +7,10 @@ export const useSongsStore = defineStore("songs", {
     loading: false,
   }),
   getters: {
-    genres(state) {
-      return [...new Set(state.items.map((s) => s.genre).filter(Boolean))].sort();
-    },
+    genres(state)  { return [...new Set(state.items.map((s) => s.genre).filter(Boolean))].sort(); },
+    artists(state) { return [...new Set(state.items.map((s) => s.artiste).filter(Boolean))].sort(); },
+    albums(state)  { return [...new Set(state.items.map((s) => s.album).filter(Boolean))].sort(); },
+    langues(state) { return [...new Set(state.items.map((s) => s.langue).filter(Boolean))].sort(); },
   },
   actions: {
     async fetchAll() {

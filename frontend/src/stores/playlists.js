@@ -17,8 +17,10 @@ export const usePlaylistsStore = defineStore("playlists", {
         this.loading = false;
       }
     },
-    async generatePreview({ genre, target_duration_seconds }) {
-      const { data } = await api.post("/playlists/generate", { genre, target_duration_seconds });
+    async generatePreview({ genre, exclude_genre, artiste, exclude_artist, album, langue, year_min, year_max, target_duration_seconds }) {
+      const { data } = await api.post("/playlists/generate", {
+        genre, exclude_genre, artiste, exclude_artist, album, langue, year_min, year_max, target_duration_seconds,
+      });
       this.preview = data;
       return data;
     },

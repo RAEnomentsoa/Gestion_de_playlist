@@ -48,13 +48,65 @@ function loadPlaylist(id) {
 }
 
 router.post("/generate", (req, res) => {
-  const { genre, target_duration_seconds } = req.body || {};
-  const target = Number(target_duration_seconds) || 0;
-  const genres = (Array.isArray(genre) ? genre : genre ? [genre] : []).filter(Boolean);
+  const {
+    genre,
+    exclude_genre,
+    artiste,
+    exclude_artist,
+    album,
+    langue,
+    year_min,
+    year_max,
+    target_duration_seconds,
+  } = req.body || {};
 
-  const songs = genres.length > 0
-    ? db.prepare(`SELECT * FROM songs WHERE genre IN (${genres.map(() => "?").join(", ")})`).all(...genres)
-    : db.prepare("SELECT * FROM songs").all();
+  const toArr = (v) => (Array.isArray(v) ? v : v ? [v] : []).filter(Boolean);
+
+  const target         = Number(target_duration_seconds) || 0;
+  const genres         = toArr(genre);
+  const excludeGenres  = toArr(exclude_genre);
+  const artistes       = toArr(artiste);
+  const excludeArtists = toArr(exclude_artist);
+  const albums         = toArr(album);
+
+  const conditions = [];
+  const params = [];
+
+  if (genres.length > 0) {
+    conditions.push(`genre IN (${genres.map(() => "?").join(", ")})`);
+    params.push(...genres);
+  }
+  if (excludeGenres.length > 0) {
+    conditions.push(`(genre IS NULL OR genre NOT IN (${excludeGenres.map(() => "?").join(", ")}))`);
+    params.push(...excludeGenres);
+  }
+  if (artistes.length > 0) {
+    conditions.push(`artiste IN (${artistes.map(() => "?").join(", ")})`);
+    params.push(...artistes);
+  }
+  if (excludeArtists.length > 0) {
+    conditions.push(`(artiste IS NULL OR artiste NOT IN (${excludeArtists.map(() => "?").join(", ")}))`);
+    params.push(...excludeArtists);
+  }
+  if (albums.length > 0) {
+    conditions.push(`album IN (${albums.map(() => "?").join(", ")})`);
+    params.push(...albums);
+  }
+  if (langue) {
+    conditions.push(`langue LIKE ?`);
+    params.push(`%${langue}%`);
+  }
+  if (year_min) {
+    conditions.push(`CAST(SUBSTR(date_sortie, 1, 4) AS INTEGER) >= ?`);
+    params.push(Number(year_min));
+  }
+  if (year_max) {
+    conditions.push(`CAST(SUBSTR(date_sortie, 1, 4) AS INTEGER) <= ?`);
+    params.push(Number(year_max));
+  }
+
+  const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const songs = db.prepare(`SELECT * FROM songs ${where}`).all(...params);
 
   const candidates = shuffle(songs);
   const picked = [];

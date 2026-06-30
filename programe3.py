@@ -69,6 +69,7 @@ def build_payload(data):
         "album": data.get("album"),
         "genre": data.get("genre"),
         "date_sortie": data.get("date"),
+        "langue": data.get("language"),
         "duree": format_duration(data.get("duration")),
     }
     bitrate = data.get("bitrate")
