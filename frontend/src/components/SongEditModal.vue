@@ -12,6 +12,7 @@ const form = reactive({
   album: "",
   genre: "",
   date_sortie: "",
+  langue: "",
 });
 
 watch(
@@ -22,6 +23,7 @@ watch(
     form.album = song.album || "";
     form.genre = song.genre || "";
     form.date_sortie = song.date_sortie || "";
+    form.langue = song.langue || "";
   },
   { immediate: true }
 );
@@ -55,6 +57,10 @@ function submit() {
       <label class="field">
         <span>Date de sortie</span>
         <input v-model="form.date_sortie" />
+      </label>
+      <label class="field">
+        <span>Langue</span>
+        <input v-model="form.langue" placeholder="ex: fr, en, mg" />
       </label>
 
       <div class="modal-actions">

@@ -68,6 +68,7 @@ router.post("/generate", (req, res) => {
   const artistes       = toArr(artiste);
   const excludeArtists = toArr(exclude_artist);
   const albums         = toArr(album);
+  const langues        = toArr(langue);
 
   const conditions = [];
   const params = [];
@@ -92,9 +93,9 @@ router.post("/generate", (req, res) => {
     conditions.push(`album IN (${albums.map(() => "?").join(", ")})`);
     params.push(...albums);
   }
-  if (langue) {
-    conditions.push(`langue LIKE ?`);
-    params.push(`%${langue}%`);
+  if (langues.length > 0) {
+    conditions.push(`langue IN (${langues.map(() => "?").join(", ")})`);
+    params.push(...langues);
   }
   if (year_min) {
     conditions.push(`CAST(SUBSTR(date_sortie, 1, 4) AS INTEGER) >= ?`);

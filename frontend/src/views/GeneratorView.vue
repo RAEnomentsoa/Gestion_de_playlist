@@ -16,7 +16,7 @@ const criteria = reactive({
   includeArtists: [],
   excludeArtists: [],
   includeAlbums: [],
-  langue: "",
+  includeLangues: [],
   year_min: "",
   year_max: "",
   minutes: 30,
@@ -37,6 +37,7 @@ const availableExcludeGenres   = computed(() => songsStore.genres.filter((g)  =>
 const availableIncludeArtists  = computed(() => songsStore.artists.filter((a) => !criteria.includeArtists.includes(a)  && !criteria.excludeArtists.includes(a)));
 const availableExcludeArtists  = computed(() => songsStore.artists.filter((a) => !criteria.excludeArtists.includes(a)  && !criteria.includeArtists.includes(a)));
 const availableIncludeAlbums   = computed(() => songsStore.albums.filter((a)  => !criteria.includeAlbums.includes(a)));
+const availableIncludeLangues  = computed(() => songsStore.langues.filter((l) => !criteria.includeLangues.includes(l)));
 
 const includedTracks = computed(() => preview.value.filter((t) => included.value.has(t.id)));
 const totalSeconds   = computed(() => includedTracks.value.reduce((sum, t) => sum + t.duration_seconds, 0));
@@ -61,7 +62,7 @@ async function generate() {
       artiste:        criteria.includeArtists.length ? criteria.includeArtists : undefined,
       exclude_artist: criteria.excludeArtists.length ? criteria.excludeArtists : undefined,
       album:          criteria.includeAlbums.length  ? criteria.includeAlbums  : undefined,
-      langue:         criteria.langue || undefined,
+      langue:         criteria.includeLangues.length ? criteria.includeLangues : undefined,
       year_min:       criteria.year_min ? Number(criteria.year_min) : undefined,
       year_max:       criteria.year_max ? Number(criteria.year_max) : undefined,
       target_duration_seconds: criteria.minutes * 60,
@@ -208,13 +209,22 @@ async function savePlaylist() {
 
       <div class="sep" />
 
-      <label class="field">
-        <span class="group-label">Langue</span>
-        <select v-model="criteria.langue">
-          <option value="">— Toutes les langues —</option>
-          <option v-for="l in songsStore.langues" :key="l" :value="l">{{ l }}</option>
-        </select>
-      </label>
+      <div class="filter-group">
+        <span class="group-label">Langue(s)</span>
+        <div class="chip-box">
+          <span v-for="l in criteria.includeLangues" :key="l" class="chip chip-include">
+            {{ l }}<button type="button" @click="removeChip(criteria.includeLangues, l)">×</button>
+          </span>
+          <select v-if="availableIncludeLangues.length" @change="addChip(criteria.includeLangues, $event)">
+            <option value="" disabled selected>+ Ajouter</option>
+            <option v-for="l in availableIncludeLangues" :key="l" :value="l">{{ l }}</option>
+          </select>
+          <span v-else-if="criteria.includeLangues.length === 0" class="muted" style="font-size:12px">
+            Définir via Modifier dans la Bibliothèque
+          </span>
+        </div>
+        <span class="hint muted">Vide = toutes les langues</span>
+      </div>
 
       <div class="sep" />
 
