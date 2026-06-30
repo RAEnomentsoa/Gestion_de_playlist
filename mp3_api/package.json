@@ -11,6 +11,7 @@
     "archiver": "^7.0.1",
     "better-sqlite3": "^12.11.1",
     "cors": "^2.8.6",
-    "express": "^4.19.2"
+    "express": "^4.19.2",
+    "multer": "^2.2.0"
   }
 }
