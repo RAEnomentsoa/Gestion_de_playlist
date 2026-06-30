@@ -9,11 +9,13 @@ const audio = new Audio();
 
 export const usePlayerStore = defineStore("player", () => {
   const playlistId = ref(null);
+  const playlistName = ref("");
   const tracks = ref([]);
   const trackIndex = ref(0);
   const isPlaying = ref(false);
   const currentTime = ref(0);
 
+  const currentTrack = computed(() => tracks.value[trackIndex.value] || null);
   const elapsedBeforeCurrentTrack = computed(() =>
     tracks.value.slice(0, trackIndex.value).reduce((sum, t) => sum + t.duration_seconds, 0)
   );
@@ -35,6 +37,7 @@ export const usePlayerStore = defineStore("player", () => {
       return;
     }
     playlistId.value = playlist.id;
+    playlistName.value = playlist.name || "";
     tracks.value = playlist.tracks;
     currentTime.value = 0;
     loadTrack(0, true);
@@ -51,6 +54,7 @@ export const usePlayerStore = defineStore("player", () => {
   function stop() {
     audio.pause();
     playlistId.value = null;
+    playlistName.value = "";
     tracks.value = [];
     trackIndex.value = 0;
     currentTime.value = 0;
@@ -90,7 +94,9 @@ export const usePlayerStore = defineStore("player", () => {
 
   return {
     playlistId,
+    playlistName,
     trackIndex,
+    currentTrack,
     isPlaying,
     combinedTotal,
     combinedElapsed,

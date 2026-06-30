@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from "vue";
 import { useUserStore } from "../stores/user";
+import NowPlayingBar from "./NowPlayingBar.vue";
 
 const user = useUserStore();
 const editingName = ref(!user.name);
@@ -17,42 +18,53 @@ function saveName() {
 
 <template>
   <div class="shell">
-    <aside class="sidebar">
-      <div class="brand">Playlist<span class="brand-accent">App</span></div>
+    <div class="body">
+      <aside class="sidebar">
+        <div class="brand">Playlist<span class="brand-accent">App</span></div>
 
-      <nav class="nav">
-        <RouterLink to="/library" class="nav-link">Bibliothèque</RouterLink>
-        <RouterLink to="/generate" class="nav-link">Générer une playlist</RouterLink>
-        <RouterLink to="/playlists" class="nav-link">Mes playlists</RouterLink>
-      </nav>
+        <nav class="nav">
+          <RouterLink to="/library" class="nav-link">Bibliothèque</RouterLink>
+          <RouterLink to="/generate" class="nav-link">Générer une playlist</RouterLink>
+          <RouterLink to="/playlists" class="nav-link">Mes playlists</RouterLink>
+        </nav>
 
-      <div class="user-box">
-        <template v-if="editingName">
-          <input
-            v-model="draftName"
-            placeholder="Votre nom"
-            @keyup.enter="saveName"
-          />
-          <button class="btn" :disabled="!draftName.trim()" @click="saveName">OK</button>
-        </template>
-        <template v-else>
-          <div class="user-name" @click="editingName = true" title="Changer de nom">
-            {{ user.name }}
-          </div>
-        </template>
-      </div>
-    </aside>
+        <div class="user-box">
+          <template v-if="editingName">
+            <input
+              v-model="draftName"
+              placeholder="Votre nom"
+              @keyup.enter="saveName"
+            />
+            <button class="btn" :disabled="!draftName.trim()" @click="saveName">OK</button>
+          </template>
+          <template v-else>
+            <div class="user-name" @click="editingName = true" title="Changer de nom">
+              {{ user.name }}
+            </div>
+          </template>
+        </div>
+      </aside>
 
-    <main class="content">
-      <slot />
-    </main>
+      <main class="content">
+        <slot />
+      </main>
+    </div>
+
+    <NowPlayingBar />
   </div>
 </template>
 
 <style scoped>
 .shell {
   display: flex;
+  flex-direction: column;
   height: 100%;
+}
+
+.body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
 }
 
 .sidebar {

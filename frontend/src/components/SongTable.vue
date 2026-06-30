@@ -1,64 +1,102 @@
 <script setup>
 import Skeleton from "./Skeleton.vue";
+import { usePlayerStore } from "../stores/player";
+import { parseDurationToSeconds } from "../utils/duration";
 
 defineProps({
   songs: { type: Array, required: true },
   loading: { type: Boolean, default: false },
 });
 defineEmits(["edit", "delete"]);
+
+const player = usePlayerStore();
+
+function pseudoPlaylist(song) {
+  return {
+    id: `song-${song.id}`,
+    name: song.titre || song.file_name,
+    tracks: [{
+      id: song.id,
+      titre: song.titre,
+      artiste: song.artiste,
+      duree: song.duree,
+      duration_seconds: parseDurationToSeconds(song.duree),
+      stream_url: `/api/songs/${song.id}/stream`,
+    }],
+  };
+}
+
+function isPlaying(song) {
+  return player.playlistId === `song-${song.id}` && player.isPlaying;
+}
 </script>
 
 <template>
-  <table class="song-table">
-    <thead>
-      <tr>
-        <th>Titre</th>
-        <th>Artiste</th>
-        <th>Album</th>
-        <th>Genre</th>
-        <th>Durée</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      <template v-if="loading">
-        <tr v-for="n in 6" :key="`sk-${n}`">
-          <td><Skeleton width="70%" /></td>
-          <td><Skeleton width="50%" /></td>
-          <td><Skeleton width="50%" /></td>
-          <td><Skeleton width="40%" /></td>
-          <td><Skeleton width="30%" /></td>
-          <td></td>
-        </tr>
-      </template>
-      <template v-else>
-        <tr v-for="song in songs" :key="song.id">
-          <td class="title-cell">{{ song.titre || song.file_name }}</td>
-          <td class="muted">{{ song.artiste || "—" }}</td>
-          <td class="muted">{{ song.album || "—" }}</td>
-          <td class="muted">{{ song.genre || "—" }}</td>
-          <td class="muted">{{ song.duree || "—" }}</td>
-          <td class="actions">
-            <button class="btn-secondary btn-sm" @click="$emit('edit', song)">Modifier</button>
-            <button class="btn-secondary btn-sm danger" @click="$emit('delete', song)">Supprimer</button>
-          </td>
-        </tr>
-        <tr v-if="songs.length === 0">
-          <td colspan="6" class="muted empty">Aucun morceau dans la bibliothèque.</td>
-        </tr>
-      </template>
-    </tbody>
-  </table>
+  <div class="song-list">
+    <div class="header-row">
+      <span></span>
+      <span>Titre</span>
+      <span>Artiste</span>
+      <span>Album</span>
+      <span>Genre</span>
+      <span>Durée</span>
+      <span></span>
+    </div>
+
+    <template v-if="loading">
+      <div class="row" v-for="n in 6" :key="`sk-${n}`">
+        <Skeleton width="32px" height="32px" rounded="50%" />
+        <Skeleton width="70%" />
+        <Skeleton width="50%" />
+        <Skeleton width="50%" />
+        <Skeleton width="40%" />
+        <Skeleton width="30%" />
+        <span></span>
+      </div>
+    </template>
+
+    <template v-else>
+      <div
+        class="row"
+        v-for="song in songs"
+        :key="song.id"
+        :class="{ playing: player.playlistId === `song-${song.id}` }"
+      >
+        <button class="btn-icon play-btn" @click="player.playPlaylist(pseudoPlaylist(song))">
+          <span v-if="isPlaying(song)">❚❚</span>
+          <span v-else>▶</span>
+        </button>
+        <span class="title-cell">{{ song.titre || song.file_name }}</span>
+        <span class="muted">{{ song.artiste || "—" }}</span>
+        <span class="muted">{{ song.album || "—" }}</span>
+        <span class="muted">{{ song.genre || "—" }}</span>
+        <span class="muted">{{ song.duree || "—" }}</span>
+        <span class="actions">
+          <button class="btn-secondary btn-sm" @click="$emit('edit', song)">Modifier</button>
+          <button class="btn-secondary btn-sm danger" @click="$emit('delete', song)">Supprimer</button>
+        </span>
+      </div>
+      <div class="row empty-row" v-if="songs.length === 0">
+        <span class="muted empty">Aucun morceau dans la bibliothèque.</span>
+      </div>
+    </template>
+  </div>
 </template>
 
 <style scoped>
-.song-table {
+.song-list {
   width: 100%;
-  border-collapse: collapse;
 }
 
-.song-table th {
-  text-align: left;
+.header-row,
+.row {
+  display: grid;
+  grid-template-columns: 48px 2fr 1.4fr 1.4fr 1fr 80px auto;
+  align-items: center;
+  gap: 14px;
+}
+
+.header-row {
   padding: 10px 14px;
   font-size: 12px;
   text-transform: uppercase;
@@ -67,14 +105,25 @@ defineEmits(["edit", "delete"]);
   border-bottom: 1px solid var(--border);
 }
 
-.song-table td {
-  padding: 12px 14px;
-  border-bottom: 1px solid var(--border);
+.row {
+  padding: 10px 14px;
   font-size: 14px;
+  border-bottom: 1px solid var(--border);
 }
 
-.song-table tbody tr:hover {
+.row:hover,
+.row.playing {
   background: var(--bg-highlight);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.play-btn {
+  width: 32px;
+  height: 32px;
+  font-size: 11px;
 }
 
 .title-cell {
@@ -104,8 +153,12 @@ defineEmits(["edit", "delete"]);
   color: #fff;
 }
 
+.empty-row {
+  grid-template-columns: 1fr;
+  justify-items: center;
+}
+
 .empty {
-  text-align: center;
-  padding: 32px;
+  padding: 24px 0;
 }
 </style>
