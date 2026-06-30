@@ -1,152 +1,117 @@
-import os
+import json
 import time
+
+import pika
 import requests
-from mutagen.mp3 import MP3
-from mutagen.id3 import ID3, ID3NoHeaderError
 
-# ── settings ──────────────────────────────────────────────
-FOLDER        = "New_music"                      # folder to watch
-SCAN_INTERVAL = 5                                # seconds between each scan
-API_URL       = "http://localhost:8000/api/track" # API endpoint (not built yet)
-# ──────────────────────────────────────────────────────────
+from mq_common import connect_with_retry, declare_queue, log
 
-ID3_FRAME_LABELS = {
-    "TIT2": "Titre",
-    "TPE1": "Artiste",
-    "TPE2": "Artiste_album",
-    "TALB": "Album",
-    "TDRC": "Date_sortie",
-    "TYER": "Annee",
-    "TCON": "Genre",
-    "TRCK": "Piste",
-    "TCOM": "Compositeur",
-    "TCOP": "Copyright",
-    "TENC": "Encode_par",
-    "TBPM": "BPM",
-    "TSRC": "ISRC",
-    "TSSE": "Encodeur",
-}
-
-CHANNEL_MODES = {
-    0: "Stereo",
-    1: "Joint Stereo",
-    2: "Dual Channel",
-    3: "Mono",
-}
+PROG_TAG = "PROG3"
+QUEUE_IN = "mp3_meta"
+QUEUE_OUT = "mp3_sent"
+API_URL = "http://localhost:8080/api/songs"
+API_TIMEOUT = 5
+FAILURE_BACKOFF = 5  # avoid hot-looping while the API is down/erroring
 
 
-def get_mp3_paths(folder):
-    """Return a set of absolute paths for every .mp3 file in the folder."""
-    paths = set()
-    for file in os.scandir(folder):
-        if file.is_file() and file.name.lower().endswith(".mp3"):
-            paths.add(os.path.abspath(file.path))
-    return paths
-
-
-def seconds_to_duration(total_seconds):
-    """Convert a float number of seconds to a 'm:ss' or 'h:mm:ss' string."""
-    minutes, seconds = divmod(int(total_seconds), 60)
-    hours,   minutes = divmod(minutes, 60)
+def format_duration(seconds):
+    """seconds (float) -> 'm:ss' or 'h:mm:ss', matching the API's duree column format."""
+    if seconds is None:
+        return None
+    minutes, secs = divmod(int(seconds), 60)
+    hours, minutes = divmod(minutes, 60)
     if hours:
-        return f"{hours}:{minutes:02}:{seconds:02}"
-    return f"{minutes}:{seconds:02}"
+        return f"{hours}:{minutes:02}:{secs:02}"
+    return f"{minutes}:{secs:02}"
 
 
-def extract_metadata(path):
-    """Read audio info and ID3 tags. Returns a dict of label → value."""
-    metadata = {}
-
-    try:
-        audio = MP3(path)
-        metadata["Duree"]       = seconds_to_duration(audio.info.length)
-        metadata["Bitrate"]     = f"{audio.info.bitrate // 1000} kbps"
-        metadata["Sample_rate"] = f"{audio.info.sample_rate} Hz"
-        metadata["Mode"]        = CHANNEL_MODES.get(audio.info.mode, str(audio.info.mode))
-    except Exception:
-        pass
-
-    try:
-        tags = ID3(path)
-        for frame_code, label in ID3_FRAME_LABELS.items():
-            frame = tags.get(frame_code)
-            if frame is None:
-                continue
-            if hasattr(frame, "text"):
-                value = ", ".join(str(v) for v in frame.text if str(v).strip())
-            else:
-                value = str(frame).strip()
-            if value:
-                metadata[label] = value
-    except ID3NoHeaderError:
-        pass
-
-    return metadata
+def build_payload(data):
+    """Map mp3_meta's English fields to the API's schema.sql French column names."""
+    payload = {
+        "absolute_path": data.get("path"),
+        "file_name": data.get("filename"),
+        "titre": data.get("title"),
+        "artiste": data.get("artist"),
+        "album": data.get("album"),
+        "genre": data.get("genre"),
+        "date_sortie": data.get("date"),
+        "duree": format_duration(data.get("duration")),
+    }
+    bitrate = data.get("bitrate")
+    if bitrate is not None:
+        payload["bitrate"] = f"{bitrate} kbps"
+    sample_rate = data.get("sample_rate")
+    if sample_rate is not None:
+        payload["sample_rate"] = f"{sample_rate} Hz"
+    if data.get("mode") is not None:
+        payload["mode"] = data["mode"]
+    return {k: v for k, v in payload.items() if v is not None or k in ("absolute_path", "file_name")}
 
 
-def send_to_api(path, metadata):
-    """
-    Send metadata + file path to the API as query parameters.
-    Example request:
-      GET http://localhost:8000/api/track?absolute_path=...&Titre=...&Artiste=...
-    """
-    # combine path and metadata into one dict for the request
-    params = {"absolute_path": path}
-    params.update(metadata)
+def make_handler(channel):
+    def handle_message(ch, method, _properties, body):
+        try:
+            data = json.loads(body)
+        except json.JSONDecodeError as exc:
+            log(PROG_TAG, f"Bad message, dropping: {exc}")
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=False)
+            return
 
-    try:
-        response = requests.get(API_URL, params=params, timeout=5)
-        print(f"[prog3] API {response.status_code} — {os.path.basename(path)}")
+        path = data.get("path")
+        filename = data.get("filename")
+        payload = build_payload(data)
 
-    except requests.ConnectionError:
-        # API not running yet — that's expected for now
-        print(f"[prog3] API OFFLINE — {os.path.basename(path)}")
+        log(PROG_TAG, f"Sending {filename} to API...")
 
-    except requests.Timeout:
-        print(f"[prog3] API TIMEOUT — {os.path.basename(path)}")
+        try:
+            response = requests.post(API_URL, json=payload, timeout=API_TIMEOUT)
+        except requests.RequestException as exc:
+            log(PROG_TAG, f"ERROR sending {filename}: {exc} — requeued")
+            time.sleep(FAILURE_BACKOFF)
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+            return
+
+        if response.ok:
+            song_id = response.json().get("id")
+            out_body = json.dumps({"path": path, "filename": filename, "id": song_id})
+            ch.basic_publish(
+                exchange="",
+                routing_key=QUEUE_OUT,
+                body=out_body,
+                properties=pika.BasicProperties(delivery_mode=2),
+            )
+            log(PROG_TAG, f"Sent OK → queued for storage move: {path}")
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+        else:
+            log(PROG_TAG, f"ERROR HTTP {response.status_code} for {filename} — requeued")
+            time.sleep(FAILURE_BACKOFF)
+            ch.basic_nack(delivery_tag=method.delivery_tag, requeue=True)
+
+    return handle_message
 
 
-def watch_folder():
-    """
-    Scan the folder every SCAN_INTERVAL seconds.
-    For every new MP3 found, extract metadata and send it to the API.
-    """
-    folder = os.path.abspath(FOLDER)
-
-    if not os.path.isdir(folder):
-        print(f"ERROR: folder '{folder}' does not exist.")
-        return
-
-    print(f"[prog3] Watching '{folder}' every {SCAN_INTERVAL}s — Ctrl+C to stop")
-    print(f"[prog3] API target: {API_URL}")
-    print("-" * 60)
-
-    # first scan: send all existing files to the API
-    known_paths = get_mp3_paths(folder)
-    print(f"[prog3] Found {len(known_paths)} MP3(s) at startup — sending to API:\n")
-    for path in sorted(known_paths):
-        metadata = extract_metadata(path)
-        send_to_api(path, metadata)
-
-    print()
-
+def run():
     while True:
-        time.sleep(SCAN_INTERVAL)
+        connection, channel = connect_with_retry(PROG_TAG)
+        declare_queue(channel, QUEUE_IN)
+        declare_queue(channel, QUEUE_OUT)
+        channel.basic_qos(prefetch_count=1)
+        channel.basic_consume(queue=QUEUE_IN, on_message_callback=make_handler(channel))
 
-        current_paths = get_mp3_paths(folder)
-        new_paths     = current_paths - known_paths
+        log(PROG_TAG, f"Waiting for messages on '{QUEUE_IN}' — API target: {API_URL}")
+        try:
+            channel.start_consuming()
+        except KeyboardInterrupt:
+            channel.stop_consuming()
+            connection.close()
+            log(PROG_TAG, "Stopped.")
+            return
+        except (pika.exceptions.AMQPConnectionError,
+                pika.exceptions.StreamLostError,
+                pika.exceptions.ChannelClosedByBroker) as exc:
+            log(PROG_TAG, f"Connection lost ({exc}) — reconnecting in 5s")
+            time.sleep(5)
 
-        for path in sorted(new_paths):
-            print(f"\n[prog3] NEW FILE — sending to API:")
-            metadata = extract_metadata(path)
-            send_to_api(path, metadata)
 
-        if new_paths:
-            known_paths = current_paths
-
-
-# ── entry point ───────────────────────────────────────────
-try:
-    watch_folder()
-except KeyboardInterrupt:
-    print("\n[prog3] Stopped.")
+if __name__ == "__main__":
+    run()
