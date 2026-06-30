@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+
+mp3_api/node_modules/
+mp3_api/mp3_library.db
+mp3_api/mp3_library.db-shm
+mp3_api/mp3_library.db-wal
+mp3_api/storage/
+
+frontend/node_modules/
+frontend/dist/
+
+*.log

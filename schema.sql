@@ -34,3 +34,19 @@ CREATE TABLE IF NOT EXISTS songs (
 
     created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS playlists (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    name            TEXT    NOT NULL,
+    owner_name      TEXT    NOT NULL,   -- display name typed by the visitor, no real auth
+    genre           TEXT,               -- generation criteria, kept for reference
+    target_duration INTEGER,            -- seconds, generation criteria
+    created_at      DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS playlist_tracks (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    playlist_id     INTEGER NOT NULL REFERENCES playlists(id) ON DELETE CASCADE,
+    song_id         INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
+    position        INTEGER NOT NULL    -- 0-based order within the playlist
+);
