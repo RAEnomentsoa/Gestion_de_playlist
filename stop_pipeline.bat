@@ -1,9 +1,8 @@
 @echo off
-REM Closes the 4 console windows opened by run_pipeline.bat (matched by window title).
+REM Stops all 4 MP3 pipeline programs and closes their console windows.
+REM Matches by command-line pattern — reliable regardless of window title changes.
 
-taskkill /FI "WINDOWTITLE eq PROG1 - Folder Watcher" /T /F
-taskkill /FI "WINDOWTITLE eq PROG2 - Metadata Extractor" /T /F
-taskkill /FI "WINDOWTITLE eq PROG3 - API Sender" /T /F
-taskkill /FI "WINDOWTITLE eq PROG4 - Storage Mover" /T /F
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -match 'programe[1-4]\.py' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
 
 echo Done.
+pause

@@ -1,4 +1,5 @@
 import json
+import os
 import time
 
 import pika
@@ -12,6 +13,39 @@ QUEUE_OUT = "mp3_sent"
 API_URL = "http://localhost:8080/api/songs"
 API_TIMEOUT = 5
 FAILURE_BACKOFF = 5  # avoid hot-looping while the API is down/erroring
+
+BLACKLIST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "blackList.txt")
+BLACKLIST_FIELDS = ("genre", "artist")
+
+
+def load_blacklist():
+    """Parse config/blackList.txt into {"genre": {...}, "artist": {...}} (lowercased).
+
+    Format: one "key:value1,value2,..." line per field, e.g. "genre:kk".
+    Missing file, empty file, or a field with no values -> nothing blacklisted for it.
+    Reloaded on every message so editing the file takes effect without a restart.
+    """
+    blacklist = {field: set() for field in BLACKLIST_FIELDS}
+    try:
+        with open(BLACKLIST_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                key, _, values = line.strip().partition(":")
+                key = key.strip().lower()
+                if key not in blacklist:
+                    continue
+                for value in values.split(","):
+                    value = value.strip().lower()
+                    if value:
+                        blacklist[key].add(value)
+    except FileNotFoundError:
+        pass
+    return blacklist
+
+
+def is_blacklisted(data, blacklist):
+    genre = (data.get("genre") or "").strip().lower()
+    artist = (data.get("artist") or "").strip().lower()
+    return bool((genre and genre in blacklist["genre"]) or (artist and artist in blacklist["artist"]))
 
 
 def format_duration(seconds):
@@ -59,6 +93,14 @@ def make_handler(channel):
 
         path = data.get("path")
         filename = data.get("filename")
+
+        blacklist = load_blacklist()
+        if is_blacklisted(data, blacklist):
+            log(PROG_TAG, f"Blacklisted (genre={data.get('genre')}, artist={data.get('artist')}) "
+                           f"— skipping: {filename}")
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
         payload = build_payload(data)
 
         log(PROG_TAG, f"Sending {filename} to API...")
