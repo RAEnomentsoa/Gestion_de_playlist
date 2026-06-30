@@ -56,6 +56,13 @@ select {
   outline: none;
 }
 
+/* the dropdown popup list is a separate browser-rendered surface — style its
+   options directly so it matches the dark theme instead of the OS default */
+select option {
+  background: var(--bg-highlight);
+  color: var(--text-primary);
+}
+
 input:focus,
 select:focus {
   border-color: var(--accent);

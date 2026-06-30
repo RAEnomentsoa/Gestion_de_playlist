@@ -50,9 +50,10 @@ function loadPlaylist(id) {
 router.post("/generate", (req, res) => {
   const { genre, target_duration_seconds } = req.body || {};
   const target = Number(target_duration_seconds) || 0;
+  const genres = (Array.isArray(genre) ? genre : genre ? [genre] : []).filter(Boolean);
 
-  const songs = genre
-    ? db.prepare("SELECT * FROM songs WHERE genre = ?").all(genre)
+  const songs = genres.length > 0
+    ? db.prepare(`SELECT * FROM songs WHERE genre IN (${genres.map(() => "?").join(", ")})`).all(...genres)
     : db.prepare("SELECT * FROM songs").all();
 
   const candidates = shuffle(songs);
@@ -75,10 +76,12 @@ router.post("/", (req, res) => {
     return res.status(400).json({ error: "name, owner_name and a non-empty song_ids array are required" });
   }
 
+  const genreLabel = Array.isArray(genre) ? genre.filter(Boolean).join(", ") || null : genre || null;
+
   const createPlaylist = db.transaction(() => {
     const info = db
       .prepare("INSERT INTO playlists (name, owner_name, genre, target_duration) VALUES (?, ?, ?, ?)")
-      .run(name, owner_name, genre || null, target_duration || null);
+      .run(name, owner_name, genreLabel, target_duration || null);
 
     const insertTrack = db.prepare(
       "INSERT INTO playlist_tracks (playlist_id, song_id, position) VALUES (?, ?, ?)"
