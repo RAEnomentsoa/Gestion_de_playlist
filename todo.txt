@@ -47,4 +47,14 @@ quand les playlists sont generes car on a ajouter des morceaux alors dans la lis
 
   inclure et exlure 
 
-	
+	alea:
+     in the ront-end:
+	 list of playist: l'utilisateur can fusion  the playlists as he want , combine as many playlist of his choice
+	and i can give a new name to the playlist combined created
+
+	program 3:
+	crieer another fichier  read durre en  seconde ex : 180 seconde
+	so in /config - blackdurrre.txt
+	ex durre:180 second
+	if the music durre is > 180 its not sent
+	so just like the black list it should not be removed from New_music
