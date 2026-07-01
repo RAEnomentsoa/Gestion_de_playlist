@@ -48,6 +48,13 @@ def run(folder, interval):
 
     try:
         while True:
+            # Re-enable publishing for files still sitting in the folder:
+            # if a file was published but is still here, it was blocked (blacklist /
+            # blackDurre) and should be retried in case the filter was changed.
+            # Files that were successfully moved by programe4 no longer exist at their
+            # original path, so they remain in published_paths and are never re-sent.
+            published_paths = {p for p in published_paths if not os.path.exists(p)}
+
             new_count = duplicate_count = skipped_count = 0
 
             for path in scan_mp3_files(folder):

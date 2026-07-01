@@ -17,6 +17,8 @@ FAILURE_BACKOFF = 5  # avoid hot-looping while the API is down/erroring
 BLACKLIST_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "blackList.txt")
 BLACKLIST_FIELDS = ("genre", "artist")
 
+BLACKDURRE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "config", "blackDurre.txt")
+
 
 def load_blacklist():
     """Parse config/blackList.txt into {"genre": {...}, "artist": {...}} (lowercased).
@@ -40,6 +42,26 @@ def load_blacklist():
     except FileNotFoundError:
         pass
     return blacklist
+
+
+def load_max_duration():
+    """Parse config/blackDurre.txt -> max allowed duration in seconds (float), or None if unset.
+
+    Format: durre:<seconds>   e.g. durre:180
+    Empty value or missing file -> no duration limit.
+    Re-read on every message so editing the file takes effect without restart.
+    """
+    try:
+        with open(BLACKDURRE_PATH, "r", encoding="utf-8") as f:
+            for line in f:
+                key, _, value = line.strip().partition(":")
+                if key.strip().lower() == "durre":
+                    value = value.strip()
+                    if value:
+                        return float(value)
+    except (FileNotFoundError, ValueError):
+        pass
+    return None
 
 
 def is_blacklisted(data, blacklist):
@@ -99,6 +121,13 @@ def make_handler(channel):
         if is_blacklisted(data, blacklist):
             log(PROG_TAG, f"Blacklisted (genre={data.get('genre')}, artist={data.get('artist')}) "
                            f"— skipping: {filename}")
+            ch.basic_ack(delivery_tag=method.delivery_tag)
+            return
+
+        max_duration = load_max_duration()
+        duration = data.get("duration")
+        if max_duration is not None and duration is not None and duration > max_duration:
+            log(PROG_TAG, f"Duration {duration:.0f}s > limit {max_duration:.0f}s — skipping: {filename}")
             ch.basic_ack(delivery_tag=method.delivery_tag)
             return
 
