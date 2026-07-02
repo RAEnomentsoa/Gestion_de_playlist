@@ -53,6 +53,12 @@ db.exec(`
       song_id         INTEGER NOT NULL REFERENCES songs(id) ON DELETE CASCADE,
       position        INTEGER NOT NULL
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT    NOT NULL UNIQUE,
+      created_at  DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 module.exports = db;

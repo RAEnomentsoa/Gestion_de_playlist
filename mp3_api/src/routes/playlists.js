@@ -115,8 +115,10 @@ router.post("/generate", (req, res) => {
 
   for (const song of candidates) {
     if (target > 0 && total >= target) break;
+    const dur = parseDurationToSeconds(song.duree);
+    if (target > 0 && total + dur > target + 59) continue;
     picked.push(toTrack(song));
-    total += parseDurationToSeconds(song.duree);
+    total += dur;
   }
 
   res.json({ tracks: picked, total_duration_seconds: total });

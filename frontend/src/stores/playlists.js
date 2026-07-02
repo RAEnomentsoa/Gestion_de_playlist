@@ -1,5 +1,6 @@
 import { defineStore } from "pinia";
 import api from "../services/api";
+import { useUserStore } from "./user";
 
 export const usePlaylistsStore = defineStore("playlists", {
   state: () => ({
@@ -11,7 +12,9 @@ export const usePlaylistsStore = defineStore("playlists", {
     async fetchAll() {
       this.loading = true;
       try {
-        const { data } = await api.get("/playlists");
+        const userStore = useUserStore();
+        const params = userStore.name ? { owner_name: userStore.name } : {};
+        const { data } = await api.get("/playlists", { params });
         this.items = data;
       } finally {
         this.loading = false;

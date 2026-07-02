@@ -15,7 +15,7 @@ QUEUE_PATHS = "mp3_paths"
 def scan_mp3_files(folder):
     """Recursively return absolute paths of every .mp3 file under folder."""
     found = []
-    for root, _dirs, files in os.walk(folder):
+    for root, _, files in os.walk(folder):
         for name in files:
             if name.lower().endswith(".mp3"):
                 found.append(os.path.abspath(os.path.join(root, name)))
@@ -38,8 +38,8 @@ def run(folder, interval):
         log(PROG_TAG, f"ERROR: folder '{folder}' does not exist.")
         sys.exit(1)
 
-    published_paths = set()   # paths already sent — never re-published
-    seen_filenames = set()    # filenames already seen — used for duplicate detection
+    published_paths = set()  # paths already sent — never re-published in this session
+    seen_filenames = set()   # filenames already seen — used for duplicate detection
 
     log(PROG_TAG, f"Watching '{folder}' recursively every {interval}s")
 
@@ -48,11 +48,9 @@ def run(folder, interval):
 
     try:
         while True:
-            # Re-enable publishing for files still sitting in the folder:
-            # if a file was published but is still here, it was blocked (blacklist /
-            # blackDurre) and should be retried in case the filter was changed.
-            # Files that were successfully moved by programe4 no longer exist at their
-            # original path, so they remain in published_paths and are never re-sent.
+            # Keep only paths that are gone from disk (successfully moved by prog4).
+            # Paths still present were blocked by a filter — remove them so they
+            # get re-queued and retried if the filter changed.
             published_paths = {p for p in published_paths if not os.path.exists(p)}
 
             new_count = duplicate_count = skipped_count = 0
@@ -92,7 +90,7 @@ def run(folder, interval):
                 f"Scan complete: {new_count} new, {duplicate_count} duplicate, "
                 f"{skipped_count} already published (skipped)")
 
-            connection.sleep(interval)  # services heartbeats while idle
+            connection.sleep(interval)
     except KeyboardInterrupt:
         log(PROG_TAG, "Stopped.")
     finally:

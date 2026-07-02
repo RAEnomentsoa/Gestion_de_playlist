@@ -58,3 +58,13 @@ quand les playlists sont generes car on a ajouter des morceaux alors dans la lis
 	ex durre:180 
 	if the music durre is > 180 its not sent
 	so just like the black list it should not be removed from New_music
+
+	manao playlyst 2 :
+
+	p1 10 min
+	 -enclure genre: -folk, slow
+	  exlure artist -Bessa
+
+	P2 13 min exlure genre : jazz
+	inclure artist: Rija Ramanantoanina,Bessa,Eric Manana
+	exclure artist -mahaleo
